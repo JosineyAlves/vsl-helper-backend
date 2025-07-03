@@ -17,7 +17,7 @@ app.get('/convert', (req, res) => {
   }
 
   const output = path.resolve(__dirname, `${title}.mp4`);
-  const command = `ffmpeg -y -i "${videoUrl}" -c copy -bsf:a aac_adtstoasc "${output}"`;
+  const command = `ffmpeg -y -headers "Referer: https://example.com\r\nUser-Agent: Mozilla/5.0\r\n" -i "${videoUrl}" -c copy -bsf:a aac_adtstoasc "${output}"`;
 
   exec(command, (err) => {
     if (err) {
