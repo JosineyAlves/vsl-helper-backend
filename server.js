@@ -7,35 +7,29 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 
-app.get('/api/download', (req, res) => {
-  const { url, title = 'vsl-video' } = req.query;
-  if (!url || !url.endsWith('.m3u8')) {
-    return res.status(400).json({ error: 'URL inválida' });
+app.get('/convert', (req, res) => {
+  const videoUrl = req.query.url;
+  const title = (req.query.title || 'video').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+  if (!videoUrl || !videoUrl.includes('.m3u8')) {
+    return res.status(400).send('URL inválida');
   }
 
-  const sanitizedTitle = title.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '-').toLowerCase();
-  const outputFile = `${sanitizedTitle}.mp4`;
+  const output = path.resolve(__dirname, `${title}.mp4`);
+  const command = `ffmpeg -y -i "${videoUrl}" -c copy -bsf:a aac_adtstoasc "${output}"`;
 
-  const command = `ffmpeg -i "${url}" -c copy -bsf:a aac_adtstoasc "${outputFile}"`;
-
-  exec(command, { cwd: __dirname }, (error) => {
-    if (error) {
-      return res.status(500).json({ error: 'Erro ao baixar vídeo' });
+  exec(command, (err) => {
+    if (err) {
+      console.error('Erro ao converter:', err);
+      return res.status(500).send('Erro ao converter o vídeo.');
     }
 
-    const filePath = path.join(__dirname, outputFile);
-    res.download(filePath, outputFile, (err) => {
-      if (err) {
-        console.error('Erro ao enviar arquivo:', err.message);
-      }
+    res.download(output, `${title}.mp4`, () => {
+      require('fs').unlinkSync(output); // Apaga após envio
     });
   });
 });
 
-app.get('/', (req, res) => {
-  res.send('🟢 VSL Helper Backend Online');
-});
-
 app.listen(PORT, () => {
-  console.log(`✅ VSL Helper rodando em http://localhost:${PORT}`);
+  console.log(`✅ Backend rodando em http://localhost:${PORT}`);
 });
