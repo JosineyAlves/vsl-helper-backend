@@ -1,47 +1,41 @@
 const express = require('express');
-const ffmpeg = require('fluent-ffmpeg');
-const fetch = require('node-fetch');
-const fs = require('fs');
+const cors = require('cors');
+const { exec } = require('child_process');
 const path = require('path');
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+app.use(cors());
 
-app.post('/convert', async (req, res) => {
-  const { url } = req.body;
-
+app.get('/api/download', (req, res) => {
+  const { url, title = 'vsl-video' } = req.query;
   if (!url || !url.endsWith('.m3u8')) {
     return res.status(400).json({ error: 'URL inválida' });
   }
 
-  const tempFile = path.join(__dirname, 'output.mp4');
-  try {
-    ffmpeg(url)
-      .outputOptions([
-        '-c copy',
-        '-bsf:a aac_adtstoasc'
-      ])
-      .on('end', () => {
-        res.download(tempFile, 'video-vsl.mp4', () => {
-          fs.unlinkSync(tempFile); // remove o arquivo temporário
-        });
-      })
-      .on('error', (err) => {
-        console.error('Erro FFmpeg:', err);
-        res.status(500).json({ error: 'Erro na conversão' });
-      })
-      .save(tempFile);
-  } catch (e) {
-    console.error('Erro geral:', e.message);
-    res.status(500).json({ error: 'Erro inesperado' });
-  }
+  const sanitizedTitle = title.replace(/[^\w\s-]/gi, '').replace(/\s+/g, '-').toLowerCase();
+  const outputFile = `${sanitizedTitle}.mp4`;
+
+  const command = `ffmpeg -i "${url}" -c copy -bsf:a aac_adtstoasc "${outputFile}"`;
+
+  exec(command, { cwd: __dirname }, (error) => {
+    if (error) {
+      return res.status(500).json({ error: 'Erro ao baixar vídeo' });
+    }
+
+    const filePath = path.join(__dirname, outputFile);
+    res.download(filePath, outputFile, (err) => {
+      if (err) {
+        console.error('Erro ao enviar arquivo:', err.message);
+      }
+    });
+  });
 });
 
-app.get('/', (_, res) => {
-  res.send('✅ VSL Helper API ativa.');
+app.get('/', (req, res) => {
+  res.send('🟢 VSL Helper Backend Online');
 });
 
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor rodando em http://localhost:${PORT}`);
+  console.log(`✅ VSL Helper rodando em http://localhost:${PORT}`);
 });
